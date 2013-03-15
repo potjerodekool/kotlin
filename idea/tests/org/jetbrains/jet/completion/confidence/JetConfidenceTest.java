@@ -27,6 +27,7 @@ import org.apache.commons.lang.SystemUtils;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.jet.InTextDirectivesUtils;
 import org.jetbrains.jet.plugin.PluginTestCaseBase;
+import org.jetbrains.jet.plugin.PluginTestCaseBase;
 
 import java.io.File;
 
@@ -79,7 +80,7 @@ public class JetConfidenceTest extends LightCompletionTestCase {
     protected static String getTypeTextFromFile() {
         String text = getEditor().getDocument().getText();
 
-        String[] directives = InTextDirectivesUtils.findArrayWithPrefix(TYPE_DIRECTIVE_PREFIX, text);
+        String[] directives = InTextDirectivesUtils.findArrayWithPrefix(text, TYPE_DIRECTIVE_PREFIX);
         assertEquals("One directive with \"" + TYPE_DIRECTIVE_PREFIX +"\" expected", 1, directives.length);
 
         return StringUtil.unquoteString(directives[0]);

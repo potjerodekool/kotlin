@@ -25,6 +25,7 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.StringReader;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 public final class InTextDirectivesUtils {
@@ -34,7 +35,7 @@ public final class InTextDirectivesUtils {
 
     @Nullable
     public static Integer getPrefixedInt(String fileText, String prefix) {
-        String[] numberStrings = findArrayWithPrefix(prefix, fileText);
+        String[] numberStrings = findArrayWithPrefix(fileText, prefix);
         if (numberStrings.length > 0) {
             return Integer.parseInt(numberStrings[0]);
         }
@@ -43,15 +44,15 @@ public final class InTextDirectivesUtils {
     }
 
     @NotNull
-    public static String[] findArrayWithPrefix(String prefix, String fileText) {
-        return ArrayUtil.toStringArray(findListWithPrefix(prefix, fileText));
+    public static String[] findArrayWithPrefix(String fileText, String... prefixes) {
+        return ArrayUtil.toStringArray(findListWithPrefix(fileText, prefixes));
     }
 
     @NotNull
-    public static List<String> findListWithPrefix(String prefix, String fileText) {
+    public static List<String> findListWithPrefix(String fileText, String... prefixes) {
         ArrayList<String> result = new ArrayList<String>();
 
-        for (String line : findLinesWithPrefixRemoved(prefix, fileText)) {
+        for (String line : findLinesWithPrefixRemoved(fileText, prefixes)) {
             String[] variants = line.split(",");
 
             for (String variant : variants) {
@@ -63,28 +64,35 @@ public final class InTextDirectivesUtils {
     }
 
     @Nullable
-    public static String findStringWithPrefix(String prefix, String fileText) {
-        List<String> strings = findListWithPrefix(prefix, fileText);
+    public static String findStringWithPrefix(String fileText, String... prefixes) {
+        List<String> strings = findListWithPrefix(fileText, prefixes);
         if (strings.isEmpty()) {
             return null;
         }
-        assert strings.size() == 1 : "There is more than one string with given prefix " + prefix + ". Use findListWithPrefix() instead.";
+        assert strings.size() == 1 : "There is more than one string with given prefixes " +
+                                     Arrays.toString(prefixes) + ". Use findListWithPrefix() instead.";
         return strings.get(0);
     }
 
     @NotNull
-    public static List<String> findLinesWithPrefixRemoved(String prefix, String fileText) {
+    public static List<String> findLinesWithPrefixRemoved(String fileText, String... prefixes) {
         ArrayList<String> result = new ArrayList<String>();
 
         for (String line : fileNonEmptyLines(fileText)) {
-            if (line.startsWith(prefix)) {
-                result.add(line.substring(prefix.length()).trim());
+            for (String prefix : prefixes) {
+                if (line.startsWith(prefix)) {
+                    String noPrefixLine = line.substring(prefix.length());
+
+                    if (noPrefixLine.isEmpty() || Character.isWhitespace(noPrefixLine.charAt(0))) {
+                        result.add(noPrefixLine.trim());
+                        break;
+                    }
+                }
             }
         }
 
         return result;
     }
-
 
     @NotNull
     private static List<String> fileNonEmptyLines(String fileText) {

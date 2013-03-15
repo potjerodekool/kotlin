@@ -22,9 +22,7 @@ import org.jetbrains.jet.plugin.PluginTestCaseBase;
 import java.io.File;
 
 public class JetClassCompletionTest extends JetCompletionTestBase {
-
     public void testInExpressionNoPrefix() {
-
         doTest();
     }
 
