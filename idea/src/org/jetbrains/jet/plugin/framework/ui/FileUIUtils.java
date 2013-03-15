@@ -60,7 +60,7 @@ public class FileUIUtils {
 
     @Nullable
     public static Map<File, File> copyWithOverwriteDialog(
-            @NotNull Component parent,
+            @Nullable Component parent,
             @NotNull String messagesTitle,
             @NotNull Map<File, String> filesWithDestinations
     ) {
