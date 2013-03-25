@@ -20,6 +20,8 @@ import com.intellij.execution.configurations.GeneralCommandLine;
 import com.intellij.openapi.util.SystemInfo;
 import org.jetbrains.jet.compiler.PathManager;
 
+import java.io.File;
+
 
 public class PermissionManager {
     private PermissionManager() {
@@ -34,6 +36,7 @@ public class PermissionManager {
             RunUtils.execute(generateChmodCmd(pathManager.getToolsFolderInAndroidSdk() + "/ddms"));
             RunUtils.execute(generateChmodCmd(pathManager.getToolsFolderInAndroidSdk() + "/android"));
             RunUtils.execute(generateChmodCmd(pathManager.getToolsFolderInAndroidSdk() + "/emulator-arm"));
+            RunUtils.execute(generateChmodCmd(pathManager.getToolsFolderInAndroidSdk() + "/emulator64-arm"));
             RunUtils.execute(generateChmodCmd(pathManager.getToolsFolderInAndroidSdk() + "/zipalign"));
             RunUtils.execute(generateChmodCmd(pathManager.getAntBinDirectory() + "/ant"));
         }
