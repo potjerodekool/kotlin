@@ -30,7 +30,7 @@ import org.jetbrains.jet.lang.resolve.BindingContext;
 import org.jetbrains.jet.lang.types.JetType;
 import org.jetbrains.jet.lang.types.TypeUtils;
 import org.jetbrains.jet.plugin.JetBundle;
-import org.jetbrains.jet.plugin.caches.resolve.KotlinCacheManager;
+import org.jetbrains.jet.plugin.caches.resolve.KotlinCacheManagerUtil;
 
 import java.util.List;
 
@@ -55,7 +55,7 @@ public class ChangeToConstructorInvocationFix extends JetIntentionAction<JetDele
     @Override
     public boolean isAvailable(@NotNull Project project, Editor editor, PsiFile file) {
         JetTypeReference typeReference = element.getTypeReference();
-        BindingContext context = KotlinCacheManager.getInstance(project).getDeclarationsFromProject().getBindingContext();
+        BindingContext context = KotlinCacheManagerUtil.getHeadersBindingContext((JetFile) file);
         JetType supertype = context.get(BindingContext.TYPE, typeReference);
         if (supertype == null) return false;
         ClassDescriptor classDescriptor = TypeUtils.getClassDescriptor(supertype);

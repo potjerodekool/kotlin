@@ -34,6 +34,7 @@ import org.jetbrains.jet.lang.types.lang.KotlinBuiltIns;
 import org.jetbrains.jet.plugin.JetBundle;
 import org.jetbrains.jet.plugin.caches.resolve.KotlinCacheManager;
 import org.jetbrains.jet.plugin.intentions.SpecifyTypeExplicitlyAction;
+import org.jetbrains.jet.plugin.project.TargetPlatform;
 
 public class ChangeReturnTypeToMatchOverriddenMethodFix extends JetIntentionAction<JetFunction> {
     private JetType matchingReturnType;
@@ -48,7 +49,7 @@ public class ChangeReturnTypeToMatchOverriddenMethodFix extends JetIntentionActi
             return false;
         }
 
-        BindingContext context = KotlinCacheManager.getInstance(project).getDeclarationsFromProject().getBindingContext();
+        BindingContext context = KotlinCacheManager.getInstance(project).getDeclarationsFromProject(TargetPlatform.JVM).getBindingContext();
         matchingReturnType = QuickFixUtil.findLowerBoundOfOverriddenCallablesReturnTypes(context, element);
         return matchingReturnType != null;
     }
