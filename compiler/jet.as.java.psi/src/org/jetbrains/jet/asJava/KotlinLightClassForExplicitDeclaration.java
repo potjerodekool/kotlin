@@ -115,6 +115,12 @@ public class KotlinLightClassForExplicitDeclaration extends AbstractLightClass i
 
     @NotNull
     @Override
+    public PsiElement[] getChildren() {
+        return getDelegate().getChildren();
+    }
+
+    @NotNull
+    @Override
     public PsiElement copy() {
         return new KotlinLightClassForExplicitDeclaration(getManager(), classFqName, classOrObject);
     }

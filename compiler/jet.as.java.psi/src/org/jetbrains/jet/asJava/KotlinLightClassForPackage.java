@@ -93,6 +93,12 @@ public class KotlinLightClassForPackage extends KotlinLightClassForPackageBase i
         return packageClassFqName.getFqName();
     }
 
+    @NotNull
+    @Override
+    public PsiElement[] getChildren() {
+        return getDelegate().getChildren();
+    }
+
     @Override
     public boolean isValid() {
         return allValid(files);
