@@ -310,7 +310,7 @@ public class CandidateResolver {
                                        : effectiveExpectedType;
 
                 //todo inner calls should be analyzed, for parenthesized, labeled, if, when expressions as well
-                JetVisitor<JetExpression, Void> callExpressionFinder = new JetVisitor<JetExpression, Void>() {
+                JetVisitor<JetExpression, Void> selectorExpressionFinder = new JetVisitor<JetExpression, Void>() {
                     @Override
                     public JetExpression visitQualifiedExpression(JetQualifiedExpression expression, Void data) {
                         JetExpression selector = expression.getSelectorExpression();
@@ -323,16 +323,29 @@ public class CandidateResolver {
                     }
 
                     @Override
+                    public JetExpression visitSimpleNameExpression(JetSimpleNameExpression expression, Void data) {
+                        return expression;
+                    }
+
+                    @Override
                     public JetExpression visitJetElement(JetElement element, Void data) {
                         return null;
                     }
                 };
-                JetExpression callExpression = expression.accept(callExpressionFinder, null);
-                if (callExpression == null) continue;
+                // selector expression is callExpression or simpleNameExpression (if it's inside qualified expression)
+                JetExpression selectorExpression = expression.accept(selectorExpressionFinder, null);
+                if (selectorExpression == null) continue;
 
                 CallCandidateResolutionContext<FunctionDescriptor> storedContextForArgument =
-                        context.resolutionResultsCache.getDeferredComputation(CallKey.create(Call.CallType.DEFAULT, callExpression));
-                if (storedContextForArgument == null) continue;
+                        context.resolutionResultsCache.getDeferredComputation(CallKey.create(Call.CallType.DEFAULT, selectorExpression));
+                if (storedContextForArgument == null) {
+                    //todo get rid of this hack, 'checkType' once at the end of the analysis
+                    if (!(expression instanceof JetSimpleNameExpression)) {
+                        JetType type = context.trace.get(BindingContext.EXPRESSION_TYPE, selectorExpression);
+                        DataFlowUtils.checkType(type, expression, context.replaceExpectedType(expectedType));
+                    }
+                    continue;
+                }
 
                 CallCandidateResolutionContext<FunctionDescriptor> contextForArgument =
                         storedContextForArgument.replaceResolveMode(ResolveMode.TOP_LEVEL_CALL).replaceBindingTrace(context.trace).replaceExpectedType(expectedType);
