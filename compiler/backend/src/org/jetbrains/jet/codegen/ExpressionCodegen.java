@@ -1535,17 +1535,17 @@ public class ExpressionCodegen extends JetVisitor<StackValue, StackValue> implem
         //    descriptor = ((VariableAsFunctionDescriptor) descriptor).getVariableDescriptor();
         //}
 
-        IntrinsicMethod intrinsic = null;
         if (descriptor instanceof CallableMemberDescriptor) {
             CallableMemberDescriptor memberDescriptor = (CallableMemberDescriptor) descriptor;
             memberDescriptor = unwrapFakeOverride(memberDescriptor);
 
-            intrinsic = state.getIntrinsics().getIntrinsic(memberDescriptor);
+            IntrinsicMethod intrinsic = state.getIntrinsics().getIntrinsic(memberDescriptor);
+            if (intrinsic != null) {
+                Type expectedType = expressionType(expression);
+                return intrinsic.generate(this, v, expectedType, expression, Collections.<JetExpression>emptyList(), receiver, state);
+            }
         }
-        if (intrinsic != null) {
-            Type expectedType = expressionType(expression);
-            return intrinsic.generate(this, v, expectedType, expression, Collections.<JetExpression>emptyList(), receiver, state);
-        }
+
 
         assert descriptor != null;
         DeclarationDescriptor container = descriptor.getContainingDeclaration();
@@ -1707,6 +1707,7 @@ public class ExpressionCodegen extends JetVisitor<StackValue, StackValue> implem
 
         boolean isStatic = containingDeclaration instanceof NamespaceDescriptor;
         boolean overridesTrait = isOverrideForTrait(propertyDescriptor);
+        boolean isInterface = isInterface(containingDeclaration) || overridesTrait;
         boolean isFakeOverride = propertyDescriptor.getKind() == CallableMemberDescriptor.Kind.FAKE_OVERRIDE;
         PropertyDescriptor initialDescriptor = propertyDescriptor;
         propertyDescriptor = initialDescriptor.getOriginal();
@@ -1744,7 +1745,7 @@ public class ExpressionCodegen extends JetVisitor<StackValue, StackValue> implem
                     propertyDescriptor = accessablePropertyDescriptor(propertyDescriptor);
                 }
 
-                getter = typeMapper.mapGetterSignature(propertyDescriptor, OwnerKind.IMPLEMENTATION).getJvmMethodSignature().getAsmMethod();
+                getter = typeMapper.mapGetterSignature(propertyDescriptor, isSuper && isInterface ? OwnerKind.TRAIT_IMPL : OwnerKind.IMPLEMENTATION).getJvmMethodSignature().getAsmMethod();
 
                 if (propertyDescriptor.getGetter() == null) {
                     getter = null;
@@ -1764,7 +1765,7 @@ public class ExpressionCodegen extends JetVisitor<StackValue, StackValue> implem
             }
             else {
                 JvmPropertyAccessorSignature jvmMethodSignature =
-                        typeMapper.mapSetterSignature(propertyDescriptor, OwnerKind.IMPLEMENTATION);
+                        typeMapper.mapSetterSignature(propertyDescriptor, isSuper && isInterface ? OwnerKind.TRAIT_IMPL : OwnerKind.IMPLEMENTATION);
                 setter = jvmMethodSignature != null ? jvmMethodSignature.getJvmMethodSignature().getAsmMethod() : null;
 
                 if (propertyDescriptor.getSetter() == null) {
@@ -1782,49 +1783,40 @@ public class ExpressionCodegen extends JetVisitor<StackValue, StackValue> implem
 
         JvmClassName owner;
         JvmClassName ownerParam;
-        boolean isInterface;
-        if (isStatic) {
-            isInterface = overridesTrait;
-            owner = ownerParam = typeMapper.getOwner(propertyDescriptor, contextKind(), isInsideModule);
 
-            getterInvokeOpcode = INVOKESTATIC;
-            setterInvokeOpcode = INVOKESTATIC;
+
+        CallableMethod callableGetter = null;
+        CallableMethod callableSetter = null;
+        if (getter == null) {
+            getterInvokeOpcode = getOpcodeForPropertyDescriptorWithoutAccessor(propertyDescriptor);
         }
         else {
-            isInterface = isInterface(containingDeclaration) || overridesTrait;
-            CallableMethod callableGetter = null;
-            CallableMethod callableSetter = null;
-            if (getter == null) {
-                getterInvokeOpcode = getOpcodeForPropertyDescriptorWithoutAccessor(propertyDescriptor);
-            }
-            else {
-                callableGetter = typeMapper.mapToCallableMethod(propertyDescriptor.getGetter(), isSuper, isInsideClass, isInsideModule, contextKind());
-                getterInvokeOpcode = callableGetter.getInvokeOpcode();
-            }
+            callableGetter = typeMapper.mapToCallableMethod(propertyDescriptor.getGetter(), isSuper, isInsideClass, isInsideModule, contextKind());
+            getterInvokeOpcode = callableGetter.getInvokeOpcode();
+        }
 
-            if (setter == null) {
-                setterInvokeOpcode = getOpcodeForPropertyDescriptorWithoutAccessor(propertyDescriptor);
-            }
-            else {
-                callableSetter = typeMapper.mapToCallableMethod(propertyDescriptor.getSetter(), isSuper, isInsideClass, isInsideModule, contextKind());
-                setterInvokeOpcode = callableSetter.getInvokeOpcode();
-            }
+        if (setter == null) {
+            setterInvokeOpcode = getOpcodeForPropertyDescriptorWithoutAccessor(propertyDescriptor);
+        }
+        else {
+            callableSetter = typeMapper.mapToCallableMethod(propertyDescriptor.getSetter(), isSuper, isInsideClass, isInsideModule, contextKind());
+            setterInvokeOpcode = callableSetter.getInvokeOpcode();
+        }
 
-            CallableMethod callableMethod = callableGetter != null ? callableGetter : callableSetter;
-            if (callableMethod == null) {
-                owner = ownerParam = typeMapper.getOwner(propertyDescriptor, contextKind(), isInsideModule);
-            }
-            else {
-                owner = isFakeOverride && !overridesTrait && !isInterface(initialDescriptor.getContainingDeclaration())
-                        ? JvmClassName.byType(typeMapper.mapType(
-                        ((ClassDescriptor) initialDescriptor.getContainingDeclaration()).getDefaultType(), JetTypeMapperMode.IMPL))
-                        : callableMethod.getOwner();
-                ownerParam = callableMethod.getDefaultImplParam();
-            }
+        CallableMethod callableMethod = callableGetter != null ? callableGetter : callableSetter;
+        if (callableMethod == null) {
+            owner = ownerParam = typeMapper.getOwner(propertyDescriptor, contextKind(), isInsideModule);
+        }
+        else {
+            owner = isFakeOverride && !overridesTrait && !isInterface(initialDescriptor.getContainingDeclaration())
+                    ? JvmClassName.byType(typeMapper.mapType(
+                    ((ClassDescriptor) initialDescriptor.getContainingDeclaration()).getDefaultType(), JetTypeMapperMode.IMPL))
+                    : callableMethod.getOwner();
+            ownerParam = callableMethod.getDefaultImplParam();
         }
 
         return StackValue.property(propertyDescriptor, owner, ownerParam, asmType(propertyDescriptor.getType()),
-                                   isStatic, isInterface, isSuper, getter, setter, getterInvokeOpcode, setterInvokeOpcode, state);
+                                   isStatic, getter, setter, getterInvokeOpcode, setterInvokeOpcode, state);
     }
 
     private static int getOpcodeForPropertyDescriptorWithoutAccessor(PropertyDescriptor descriptor) {

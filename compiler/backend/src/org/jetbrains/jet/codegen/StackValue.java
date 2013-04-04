@@ -141,15 +141,13 @@ public abstract class StackValue {
             JvmClassName methodOwnerParam,
             Type type,
             boolean isStatic,
-            boolean isInterface,
-            boolean isSuper,
             @Nullable Method getter,
             @Nullable Method setter,
             int getterInvokeOpcode,
             int setterInvokeOpcode,
             GenerationState state
     ) {
-        return new Property(descriptor, methodOwner, methodOwnerParam, getter, setter, isStatic, isInterface, isSuper, type, getterInvokeOpcode, setterInvokeOpcode,
+        return new Property(descriptor, methodOwner, methodOwnerParam, getter, setter, isStatic, type, getterInvokeOpcode, setterInvokeOpcode,
                             state);
     }
 
@@ -870,8 +868,6 @@ public abstract class StackValue {
         @NotNull
         private final JvmClassName methodOwnerParam;
 
-        private final boolean isInterface;
-        private final boolean isSuper;
         private final int getterInvokeOpcode;
         private final int setterInvokeOpcode;
         @NotNull
@@ -881,7 +877,7 @@ public abstract class StackValue {
 
         public Property(
                 @NotNull PropertyDescriptor descriptor, @NotNull JvmClassName methodOwner, @NotNull JvmClassName methodOwnerParam,
-                @Nullable Method getter, @Nullable Method setter, boolean isStatic, boolean isInterface, boolean isSuper,
+                @Nullable Method getter, @Nullable Method setter, boolean isStatic,
                 @NotNull Type type, int getterInvokeOpcode, int setterInvokeOpcode, @NotNull GenerationState state
         ) {
             super(type, isStatic);
@@ -889,8 +885,6 @@ public abstract class StackValue {
             this.methodOwnerParam = methodOwnerParam;
             this.getter = getter;
             this.setter = setter;
-            this.isInterface = isInterface;
-            this.isSuper = isSuper;
             this.getterInvokeOpcode = getterInvokeOpcode;
             this.setterInvokeOpcode = setterInvokeOpcode;
             this.descriptor = descriptor;
@@ -905,20 +899,13 @@ public abstract class StackValue {
 
         @Override
         public void put(Type type, InstructionAdapter v) {
-            if (isSuper && isInterface) {
-                assert getter != null;
-                v.visitMethodInsn(INVOKESTATIC, methodOwner.getInternalName(), getter.getName(),
-                                  getter.getDescriptor().replace("(", "(" + methodOwnerParam.getDescriptor()));
+            if (getter == null) {
+                v.visitFieldInsn(isStatic ? GETSTATIC : GETFIELD, methodOwner.getInternalName(), descriptor.getName().getName(),
+                                 this.type.getDescriptor());
+                genNotNullAssertionForField(v, state, descriptor);
             }
             else {
-                if (getter == null) {
-                    v.visitFieldInsn(isStatic ? GETSTATIC : GETFIELD, methodOwner.getInternalName(), descriptor.getName().getName(),
-                                     this.type.getDescriptor());
-                    genNotNullAssertionForField(v, state, descriptor);
-                }
-                else {
-                    v.visitMethodInsn(getterInvokeOpcode, methodOwner.getInternalName(), getter.getName(), getter.getDescriptor());
-                }
+                v.visitMethodInsn(getterInvokeOpcode, methodOwner.getInternalName(), getter.getName(), getter.getDescriptor());
             }
             coerceTo(type, v);
         }
@@ -926,15 +913,9 @@ public abstract class StackValue {
         @Override
         public void store(Type topOfStackType, InstructionAdapter v) {
             coerceFrom(topOfStackType, v);
-            if (isSuper && isInterface) {
-                assert setter != null;
-                v.visitMethodInsn(INVOKESTATIC, methodOwner.getInternalName(), setter.getName(),
-                                  setter.getDescriptor().replace("(", "(" + methodOwnerParam.getDescriptor()));
-            }
-            else if (setter == null) {
+            if (setter == null) {
                 v.visitFieldInsn(isStatic ? PUTSTATIC : PUTFIELD, methodOwner.getInternalName(), descriptor.getName().getName(),
-                                 this.type.getDescriptor());
-            }
+                                 this.type.getDescriptor()); }
             else {
                 v.visitMethodInsn(setterInvokeOpcode, methodOwner.getInternalName(), setter.getName(), setter.getDescriptor());
             }

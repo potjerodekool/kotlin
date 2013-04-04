@@ -1631,7 +1631,7 @@ public class ImplementationBodyCodegen extends ClassBodyCodegen {
                         JvmClassName owner = typeMapper.getOwner(propertyDescriptor, OwnerKind.IMPLEMENTATION, isCallInsideSameModuleAsDeclared(propertyDescriptor, codegen.context));
                         Type propType = typeMapper.mapType(jetType);
                         StackValue.property(propertyDescriptor, owner, owner,
-                                            propType, false, false, false, null, null, 0, 0, state).store(propType, iv);
+                                            propType, false, null, null, 0, 0, state).store(propType, iv);
                     }
                 }
             }
