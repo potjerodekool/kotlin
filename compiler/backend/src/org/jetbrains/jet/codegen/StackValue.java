@@ -138,7 +138,6 @@ public abstract class StackValue {
     public static Property property(
             PropertyDescriptor descriptor,
             JvmClassName methodOwner,
-            JvmClassName methodOwnerParam,
             Type type,
             boolean isStatic,
             @Nullable Method getter,
@@ -147,7 +146,7 @@ public abstract class StackValue {
             int setterInvokeOpcode,
             GenerationState state
     ) {
-        return new Property(descriptor, methodOwner, methodOwnerParam, getter, setter, isStatic, type, getterInvokeOpcode, setterInvokeOpcode,
+        return new Property(descriptor, methodOwner, getter, setter, isStatic, type, getterInvokeOpcode, setterInvokeOpcode,
                             state);
     }
 
@@ -865,8 +864,6 @@ public abstract class StackValue {
         private final Method setter;
         @NotNull
         public final JvmClassName methodOwner;
-        @NotNull
-        private final JvmClassName methodOwnerParam;
 
         private final int getterInvokeOpcode;
         private final int setterInvokeOpcode;
@@ -876,13 +873,12 @@ public abstract class StackValue {
         private final GenerationState state;
 
         public Property(
-                @NotNull PropertyDescriptor descriptor, @NotNull JvmClassName methodOwner, @NotNull JvmClassName methodOwnerParam,
+                @NotNull PropertyDescriptor descriptor, @NotNull JvmClassName methodOwner,
                 @Nullable Method getter, @Nullable Method setter, boolean isStatic,
                 @NotNull Type type, int getterInvokeOpcode, int setterInvokeOpcode, @NotNull GenerationState state
         ) {
             super(type, isStatic);
             this.methodOwner = methodOwner;
-            this.methodOwnerParam = methodOwnerParam;
             this.getter = getter;
             this.setter = setter;
             this.getterInvokeOpcode = getterInvokeOpcode;
