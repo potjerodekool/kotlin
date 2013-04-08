@@ -1708,14 +1708,12 @@ public class ExpressionCodegen extends JetVisitor<StackValue, StackValue> implem
         boolean isSuper = superExpression != null;
         boolean overridesTrait = isOverrideForTrait(propertyDescriptor);
         boolean isFakeOverride = propertyDescriptor.getKind() == CallableMemberDescriptor.Kind.FAKE_OVERRIDE;
-        boolean isCallToTraitImpl = isInterface(containingDeclaration) || overridesTrait;
-
-        PropertyDescriptor initialDescriptor = propertyDescriptor;
-        propertyDescriptor = initialDescriptor.getOriginal();
+        boolean isCallToTraitImpl = isInterface(containingDeclaration) && isSuper;
         boolean isInsideClass = isCallInsideSameClassAsDeclared(propertyDescriptor, context);
         boolean isInsideModule = isCallInsideSameModuleAsDeclared(propertyDescriptor, context);
         boolean isExtensionProperty = propertyDescriptor.getReceiverParameter() != null;
-
+        PropertyDescriptor initialDescriptor = propertyDescriptor;
+        propertyDescriptor = initialDescriptor.getOriginal();
 
         Method getter = null;
         Method setter = null;
