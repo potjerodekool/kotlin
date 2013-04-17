@@ -260,12 +260,6 @@ public class KotlinBuiltIns {
                 @NotNull WritableScope namespaceMemberScope) {
             // DO nothing
         }
-
-        @NotNull
-        @Override
-        public PlatformToKotlinClassMap getPlatformToKotlinClassMap() {
-            return PlatformToKotlinClassMap.EMPTY;
-        }
     }
 
     private void makePrimitive(PrimitiveType primitiveType) {
