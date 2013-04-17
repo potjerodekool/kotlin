@@ -224,6 +224,6 @@ public enum AnalyzerFacadeForJVM implements AnalyzerFacade {
 
     @NotNull
     public static ModuleDescriptorImpl createJavaModule(@NotNull String name) {
-        return new ModuleDescriptorImpl(Name.special(name), JavaBridgeConfiguration.ALL_JAVA_IMPORTS);
+        return new ModuleDescriptorImpl(Name.special(name), JavaBridgeConfiguration.ALL_JAVA_IMPORTS, JavaToKotlinClassMap.getInstance());
     }
 }
