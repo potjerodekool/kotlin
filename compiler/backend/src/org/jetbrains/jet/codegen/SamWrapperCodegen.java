@@ -25,10 +25,7 @@ import org.jetbrains.jet.codegen.context.CodegenContext;
 import org.jetbrains.jet.codegen.state.GenerationState;
 import org.jetbrains.jet.codegen.state.GenerationStateAware;
 import org.jetbrains.jet.codegen.state.JetTypeMapperMode;
-import org.jetbrains.jet.lang.descriptors.CallableDescriptor;
-import org.jetbrains.jet.lang.descriptors.ClassDescriptor;
-import org.jetbrains.jet.lang.descriptors.FunctionDescriptor;
-import org.jetbrains.jet.lang.descriptors.SimpleFunctionDescriptor;
+import org.jetbrains.jet.lang.descriptors.*;
 import org.jetbrains.jet.lang.psi.JetCallExpression;
 import org.jetbrains.jet.lang.psi.JetExpression;
 import org.jetbrains.jet.lang.resolve.BindingContext;
@@ -47,11 +44,8 @@ import static org.jetbrains.jet.lang.resolve.java.AsmTypeConstants.OBJECT_TYPE;
 public class SamWrapperCodegen extends GenerationStateAware {
     private static final String FUNCTION_FIELD_NAME = "function";
 
-    @NotNull private final ClassDescriptor samInterface;
-
-    public SamWrapperCodegen(@NotNull GenerationState state, @NotNull ClassDescriptor samInterface) {
+    public SamWrapperCodegen(@NotNull GenerationState state) {
         super(state);
-        this.samInterface = samInterface;
     }
 
     public JvmClassName genWrapper(JetCallExpression callExpression, JetExpression argumentExpression) {
@@ -73,11 +67,13 @@ public class SamWrapperCodegen extends GenerationStateAware {
 
         // e.g. Comparator<Int, Int>
         JetType resultType = resolvedCall.getResultingDescriptor().getReturnType();
-        assert resultType != null && resultType.getConstructor() == samInterface.getTypeConstructor() :
-                "unexpected result type: " + resultType;
+        assert resultType != null : "unexpected result type: " + resultType;
 
         // e.g. compare(Int, Int)
         SimpleFunctionDescriptor interfaceFunction = SingleAbstractMethodUtils.getAbstractMethodOfSamType(resultType);
+
+        ClassDescriptor resultClass = (ClassDescriptor) resultType.getConstructor().getDeclarationDescriptor();
+        assert resultClass != null : "Null classifier for " + resultType;
 
         ClassBuilder cv = state.getFactory().newVisitor(name.getInternalName(), callExpression.getContainingFile());
         cv.defineClass(callExpression,
@@ -86,7 +82,7 @@ public class SamWrapperCodegen extends GenerationStateAware {
                        name.getInternalName(),
                        null,
                        OBJECT_TYPE.getInternalName(),
-                       new String[]{JvmClassName.byClassDescriptor(samInterface).getInternalName()}
+                       new String[]{JvmClassName.byClassDescriptor(resultClass).getInternalName()}
         );
         cv.visitSource(callExpression.getContainingFile().getName(), null);
 
