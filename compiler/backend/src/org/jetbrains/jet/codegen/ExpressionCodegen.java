@@ -1813,12 +1813,13 @@ public class ExpressionCodegen extends JetVisitor<StackValue, StackValue> implem
         ValueArgument valueArgument = ((ExpressionValueArgument) argument).getValueArgument();
         assert valueArgument != null : "getValueArgument() is null for " + expression.getText();
         JetExpression argumentExpression = valueArgument.getArgumentExpression();
+        assert argumentExpression != null : "argument expression is null for " + expression.getText();
 
         if (argumentExpression instanceof JetFunctionLiteralExpression) {
             return genClosure(((JetFunctionLiteralExpression) argumentExpression).getFunctionLiteral(), samInterface);
         }
         else {
-            JvmClassName className = new SamWrapperCodegen(state).genWrapper(expression, argumentExpression);
+            JvmClassName className = new SamWrapperCodegen(state).genForConstructor(expression, argumentExpression);
 
             v.anew(className.getAsmType());
             v.dup();

@@ -16,6 +16,7 @@
 
 package org.jetbrains.jet.codegen;
 
+import com.intellij.psi.PsiElement;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.asm4.MethodVisitor;
 import org.jetbrains.asm4.Type;
@@ -48,7 +49,8 @@ public class SamWrapperCodegen extends GenerationStateAware {
         super(state);
     }
 
-    public JvmClassName genWrapper(JetCallExpression callExpression, JetExpression argumentExpression) {
+    @NotNull
+    public JvmClassName genForConstructor(@NotNull JetCallExpression callExpression, @NotNull JetExpression argumentExpression) {
         // Example: we generate SAM constructor call Comparator(f), where f: (Int, Int) -> Int
 
         // Name for generated class, in form of whatever$1
@@ -65,26 +67,36 @@ public class SamWrapperCodegen extends GenerationStateAware {
                 bindingContext.get(BindingContext.RESOLVED_CALL, callExpression.getCalleeExpression());
         assert resolvedCall != null : "couldn't find resolved call for " + callExpression.getText();
 
-        // e.g. Comparator<Int, Int>
-        JetType resultType = resolvedCall.getResultingDescriptor().getReturnType();
-        assert resultType != null : "unexpected result type: " + resultType;
+        // e.g. Comparator<Int>
+        JetType samType = resolvedCall.getResultingDescriptor().getReturnType();
+        assert samType != null : "unexpected result type: " + samType;
 
+        genWrapper(callExpression, name, functionType, samType);
+        return name;
+    }
+
+    private void genWrapper(
+            @NotNull PsiElement origin,
+            @NotNull JvmClassName name,    // E. g. package.bar.Foo$bar$1
+            @NotNull JetType functionType, // E. g. (Int, Int) -> Int
+            @NotNull JetType samType       // Comparator<Int>
+    ) {
         // e.g. compare(Int, Int)
-        SimpleFunctionDescriptor interfaceFunction = SingleAbstractMethodUtils.getAbstractMethodOfSamType(resultType);
+        SimpleFunctionDescriptor interfaceFunction = SingleAbstractMethodUtils.getAbstractMethodOfSamType(samType);
 
-        ClassDescriptor resultClass = (ClassDescriptor) resultType.getConstructor().getDeclarationDescriptor();
-        assert resultClass != null : "Null classifier for " + resultType;
+        ClassDescriptor resultClass = (ClassDescriptor) samType.getConstructor().getDeclarationDescriptor();
+        assert resultClass != null : "Null classifier for " + samType;
 
-        ClassBuilder cv = state.getFactory().newVisitor(name.getInternalName(), callExpression.getContainingFile());
-        cv.defineClass(callExpression,
+        ClassBuilder cv = state.getFactory().newVisitor(name.getInternalName(), origin.getContainingFile());
+        cv.defineClass(origin,
                        V1_6,
                        ACC_FINAL,
                        name.getInternalName(),
                        null,
                        OBJECT_TYPE.getInternalName(),
-                       new String[]{JvmClassName.byClassDescriptor(resultClass).getInternalName()}
+                       new String[] {JvmClassName.byClassDescriptor(resultClass).getInternalName()}
         );
-        cv.visitSource(callExpression.getContainingFile().getName(), null);
+        cv.visitSource(origin.getContainingFile().getName(), null);
 
         // e.g. ASM type for Function2
         Type functionAsmType = state.getTypeMapper().mapType(functionType, JetTypeMapperMode.VALUE);
@@ -100,8 +112,6 @@ public class SamWrapperCodegen extends GenerationStateAware {
         generateMethod(name.getAsmType(), functionAsmType, cv, interfaceFunction, functionType);
 
         cv.done();
-
-        return name;
     }
 
     private void generateConstructor(Type ownerType, Type functionType, ClassBuilder cv) {
