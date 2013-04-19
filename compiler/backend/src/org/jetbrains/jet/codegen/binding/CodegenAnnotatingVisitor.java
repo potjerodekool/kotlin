@@ -30,9 +30,11 @@ import org.jetbrains.jet.lang.resolve.calls.model.ResolvedCall;
 import org.jetbrains.jet.lang.resolve.java.JvmAbi;
 import org.jetbrains.jet.lang.resolve.java.JvmClassName;
 import org.jetbrains.jet.lang.resolve.java.PackageClassUtils;
+import org.jetbrains.jet.lang.resolve.java.sam.SingleAbstractMethodUtils;
 import org.jetbrains.jet.lang.resolve.name.FqName;
 import org.jetbrains.jet.lang.resolve.name.Name;
 import org.jetbrains.jet.lang.resolve.scopes.JetScope;
+import org.jetbrains.jet.lang.types.JetType;
 import org.jetbrains.jet.lang.types.lang.KotlinBuiltIns;
 
 import java.util.Collections;
@@ -71,11 +73,42 @@ class CodegenAnnotatingVisitor extends JetVisitorVoid {
         DeclarationDescriptor funDescriptor = resolvedCall.getResultingDescriptor();
 
         if (funDescriptor instanceof SimpleFunctionDescriptor) {
-            ClassDescriptor samTrait = bindingContext.get(
-                    BindingContext.SAM_CONSTRUCTOR_TO_INTERFACE, ((SimpleFunctionDescriptor) funDescriptor).getOriginal());
-            if (samTrait != null) {
-                String name = inventAnonymousClassName(expression);
-                bindingTrace.record(FQN_FOR_SAM_CONSTRUCTOR, expression, JvmClassName.byInternalName(name));
+            SimpleFunctionDescriptor simpleFun = (SimpleFunctionDescriptor) funDescriptor;
+            generateNamesForSamConstructor(expression, simpleFun);
+            generateNamesForSamAdapter(resolvedCall, simpleFun);
+        }
+    }
+
+    private void generateNamesForSamConstructor(
+            @NotNull JetCallExpression expression,
+            @NotNull SimpleFunctionDescriptor samConstructor
+    ) {
+        ClassDescriptor samTrait = bindingContext.get(BindingContext.SAM_CONSTRUCTOR_TO_INTERFACE, samConstructor);
+        if (samTrait != null) {
+            String name = inventAnonymousClassName(expression);
+            bindingTrace.record(FQN_FOR_SAM_CONSTRUCTOR, expression, JvmClassName.byInternalName(name));
+        }
+    }
+
+    private void generateNamesForSamAdapter(
+            @NotNull ResolvedCall<? extends CallableDescriptor> resolvedCall,
+            @NotNull SimpleFunctionDescriptor samAdapter
+    ) {
+        SimpleFunctionDescriptor originalOfSamAdapter = bindingContext.get(
+                BindingContext.SAM_ADAPTER_FUNCTION_TO_ORIGINAL, samAdapter.getOriginal());
+        if (originalOfSamAdapter == null) {
+            return;
+        }
+        for (ValueParameterDescriptor parameter : samAdapter.getValueParameters()) {
+            JetType originalType = originalOfSamAdapter.getValueParameters().get(parameter.getIndex()).getType();
+            if (!SingleAbstractMethodUtils.isSamType(originalType)) {
+                continue;
+            }
+
+            for (ValueArgument valueArgument : resolvedCall.getValueArguments().get(parameter).getArguments()) {
+                JetExpression argExpression = valueArgument.getArgumentExpression();
+                String name = inventAnonymousClassName(argExpression);
+                bindingTrace.record(FQN_FOR_SAM_WRAPPER_IN_ADAPTER_CALL, argExpression, JvmClassName.byInternalName(name));
             }
         }
     }

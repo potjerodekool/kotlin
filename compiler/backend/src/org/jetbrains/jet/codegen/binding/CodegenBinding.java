@@ -51,6 +51,8 @@ public class CodegenBinding {
 
     public static final WritableSlice<JetCallExpression, JvmClassName> FQN_FOR_SAM_CONSTRUCTOR = Slices.createSimpleSlice();
 
+    public static final WritableSlice<JetExpression, JvmClassName> FQN_FOR_SAM_WRAPPER_IN_ADAPTER_CALL = Slices.createSimpleSlice();
+
     public static final WritableSlice<JvmClassName, Boolean> SCRIPT_NAMES = Slices.createSimpleSetSlice();
 
     public static final WritableSlice<ClassDescriptor, Boolean> ENUM_ENTRY_CLASS_NEED_SUBCLASS = Slices.createSimpleSetSlice();
