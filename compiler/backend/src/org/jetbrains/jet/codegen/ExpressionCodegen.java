@@ -69,7 +69,6 @@ import java.util.*;
 import static org.jetbrains.asm4.Opcodes.*;
 import static org.jetbrains.jet.codegen.AsmUtil.*;
 import static org.jetbrains.jet.codegen.CodegenUtil.*;
-import static org.jetbrains.jet.codegen.CodegenUtil.isInterface;
 import static org.jetbrains.jet.codegen.binding.CodegenBinding.*;
 import static org.jetbrains.jet.lang.resolve.BindingContext.*;
 import static org.jetbrains.jet.lang.resolve.BindingContextUtils.descriptorToDeclaration;
@@ -1782,7 +1781,7 @@ public class ExpressionCodegen extends JetVisitor<StackValue, StackValue> implem
                             BindingContext.SAM_CONSTRUCTOR_TO_INTERFACE, ((SimpleFunctionDescriptor) funDescriptor).getOriginal());
 
                     if (samInterface != null) {
-                        return invokeSamConstructor(expression, resolvedCall, (SimpleFunctionDescriptor) funDescriptor, samInterface);
+                        return invokeSamConstructor(expression, resolvedCall);
                     }
                 }
                 return invokeFunction(call, receiver, resolvedCall);
@@ -1800,31 +1799,54 @@ public class ExpressionCodegen extends JetVisitor<StackValue, StackValue> implem
     }
 
     private StackValue invokeSamConstructor(
-            JetCallExpression expression,
-            ResolvedCall<? extends CallableDescriptor> resolvedCall,
-            SimpleFunctionDescriptor funDescriptor,
-            ClassDescriptor samInterface
+            JetCallExpression callExpression,
+            ResolvedCall<? extends CallableDescriptor> resolvedCall
     ) {
         ResolvedValueArgument argument = resolvedCall.getValueArgumentsByIndex().get(0);
         if (!(argument instanceof ExpressionValueArgument)) {
             throw new IllegalStateException(
-                    "argument of SAM constructor is " + argument.getClass().getName() + " " + expression.getText());
+                    "argument of SAM constructor is " + argument.getClass().getName() + " " + callExpression.getText());
         }
         ValueArgument valueArgument = ((ExpressionValueArgument) argument).getValueArgument();
-        assert valueArgument != null : "getValueArgument() is null for " + expression.getText();
+        assert valueArgument != null : "getValueArgument() is null for " + callExpression.getText();
         JetExpression argumentExpression = valueArgument.getArgumentExpression();
-        assert argumentExpression != null : "argument expression is null for " + expression.getText();
+        assert argumentExpression != null : "argument expression is null for " + callExpression.getText();
+
+        SimpleFunctionDescriptor funDescriptor = (SimpleFunctionDescriptor) resolvedCall.getResultingDescriptor();
+        JetType functionType = funDescriptor.getValueParameters().get(0).getType();
+        JetType samType = funDescriptor.getReturnType();
+        assert samType != null : "return type is null for " + funDescriptor;
+
+        JvmClassName className = bindingContext.get(CodegenBinding.FQN_FOR_SAM_CONSTRUCTOR, callExpression);
+        assert className != null : "internal class name not found for " + callExpression.getText();
+
+        return createSamValue(callExpression, (ExpressionValueArgument) argument, functionType, samType, className);
+    }
+
+    private StackValue createSamValue(
+            @NotNull PsiElement origin,
+            @NotNull ExpressionValueArgument argument,
+            @NotNull JetType functionType,
+            @NotNull JetType samType,
+            @NotNull JvmClassName className
+    ) {
+        ValueArgument valueArgument = argument.getValueArgument();
+        assert valueArgument != null : "getValueArgument() is null for " + origin.getText();
+        JetExpression argumentExpression = valueArgument.getArgumentExpression();
+        assert argumentExpression != null : "argument expression is null for " + origin.getText();
 
         if (argumentExpression instanceof JetFunctionLiteralExpression) {
+            ClassDescriptor samInterface = (ClassDescriptor) samType.getConstructor().getDeclarationDescriptor();
+            assert samInterface != null : "sam interface is null for " + samType;
+
             return genClosure(((JetFunctionLiteralExpression) argumentExpression).getFunctionLiteral(), samInterface);
         }
         else {
-            JvmClassName className = new SamWrapperCodegen(state).genForConstructor(expression, argumentExpression);
+            new SamWrapperCodegen(state).genWrapper(origin, className, functionType, samType);
 
             v.anew(className.getAsmType());
             v.dup();
 
-            JetType functionType = funDescriptor.getValueParameters().get(0).getType();
             gen(argumentExpression, typeMapper.mapType(functionType));
 
             v.invokespecial(className.getInternalName(), "<init>",

@@ -21,21 +21,17 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.asm4.MethodVisitor;
 import org.jetbrains.asm4.Type;
 import org.jetbrains.asm4.commons.InstructionAdapter;
-import org.jetbrains.jet.codegen.binding.CodegenBinding;
 import org.jetbrains.jet.codegen.context.CodegenContext;
 import org.jetbrains.jet.codegen.state.GenerationState;
 import org.jetbrains.jet.codegen.state.GenerationStateAware;
 import org.jetbrains.jet.codegen.state.JetTypeMapperMode;
-import org.jetbrains.jet.lang.descriptors.*;
-import org.jetbrains.jet.lang.psi.JetCallExpression;
-import org.jetbrains.jet.lang.psi.JetExpression;
-import org.jetbrains.jet.lang.resolve.BindingContext;
-import org.jetbrains.jet.lang.resolve.calls.model.ResolvedCall;
+import org.jetbrains.jet.lang.descriptors.ClassDescriptor;
+import org.jetbrains.jet.lang.descriptors.FunctionDescriptor;
+import org.jetbrains.jet.lang.descriptors.SimpleFunctionDescriptor;
 import org.jetbrains.jet.lang.resolve.java.JvmClassName;
 import org.jetbrains.jet.lang.resolve.java.sam.SingleAbstractMethodUtils;
 import org.jetbrains.jet.lang.resolve.name.Name;
 import org.jetbrains.jet.lang.types.JetType;
-import org.jetbrains.jet.lang.types.lang.KotlinBuiltIns;
 
 import static org.jetbrains.asm4.Opcodes.*;
 import static org.jetbrains.jet.codegen.AsmUtil.NO_FLAG_PACKAGE_PRIVATE;
@@ -49,33 +45,7 @@ public class SamWrapperCodegen extends GenerationStateAware {
         super(state);
     }
 
-    @NotNull
-    public JvmClassName genForConstructor(@NotNull JetCallExpression callExpression, @NotNull JetExpression argumentExpression) {
-        // Example: we generate SAM constructor call Comparator(f), where f: (Int, Int) -> Int
-
-        // Name for generated class, in form of whatever$1
-        JvmClassName name = bindingContext.get(CodegenBinding.FQN_FOR_SAM_CONSTRUCTOR, callExpression);
-        assert name != null : "internal class name not found for " + callExpression.getText();
-
-        // e.g. (Int, Int) -> Int
-        JetType functionType = bindingContext.get(BindingContext.EXPRESSION_TYPE, argumentExpression);
-        assert functionType != null && KotlinBuiltIns.getInstance().isFunctionType(functionType) :
-                "not a function type of " + argumentExpression.getText() + ": " + functionType;
-
-        // SAM constructor call
-        ResolvedCall<? extends CallableDescriptor> resolvedCall =
-                bindingContext.get(BindingContext.RESOLVED_CALL, callExpression.getCalleeExpression());
-        assert resolvedCall != null : "couldn't find resolved call for " + callExpression.getText();
-
-        // e.g. Comparator<Int>
-        JetType samType = resolvedCall.getResultingDescriptor().getReturnType();
-        assert samType != null : "unexpected result type: " + samType;
-
-        genWrapper(callExpression, name, functionType, samType);
-        return name;
-    }
-
-    private void genWrapper(
+    public void genWrapper(
             @NotNull PsiElement origin,
             @NotNull JvmClassName name,    // E. g. package.bar.Foo$bar$1
             @NotNull JetType functionType, // E. g. (Int, Int) -> Int
