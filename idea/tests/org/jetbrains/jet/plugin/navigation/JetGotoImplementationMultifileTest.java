@@ -23,11 +23,19 @@ import org.jetbrains.jet.plugin.PluginTestCaseBase;
 import java.io.File;
 
 public class JetGotoImplementationMultifileTest extends CodeInsightTestCase {
+    public void testImplementFunInJava() {
+        doKotlinJavaTest();
+    }
+
     public void testImplementKotlinClassInJava() {
         doKotlinJavaTest();
     }
 
     public void testImplementJavaClassInKotlin() {
+        doKotlinJavaTest();
+    }
+
+    public void testImplementMethodInKotlin() {
         doKotlinJavaTest();
     }
 
