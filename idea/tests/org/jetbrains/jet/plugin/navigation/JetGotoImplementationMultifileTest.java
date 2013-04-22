@@ -23,22 +23,32 @@ import org.jetbrains.jet.plugin.PluginTestCaseBase;
 import java.io.File;
 
 public class JetGotoImplementationMultifileTest extends CodeInsightTestCase {
-    public void testImplementKotlinClassInJava() throws Exception {
+    public void testImplementKotlinClassInJava() {
         doKotlinJavaTest();
     }
 
-    public void testImplementJavaClassInKotlin() throws Exception {
+    public void testImplementJavaClassInKotlin() {
         doKotlinJavaTest();
     }
 
-    private void doKotlinJavaTest() throws Exception {
-        doMultifileTest(getTestName(false) + ".kt", getTestName(false) + ".java");
+    private void doKotlinJavaTest() {
+        try {
+            doMultifileTest(getTestName(false) + ".kt", getTestName(false) + ".java");
+        }
+        catch (Exception exc) {
+            throw new RuntimeException(exc);
+        }
     }
 
-    private void doMultifileTest(String ... fileNames) throws Exception {
-        configureByFiles(null, fileNames);
-        GotoTargetHandler.GotoData gotoData = NavigationTestUtils.invokeGotoImplementations(getEditor(), getFile());
-        NavigationTestUtils.assertGotoImplementations(getEditor(), gotoData);
+    private void doMultifileTest(String ... fileNames) {
+        try {
+            configureByFiles(null, fileNames);
+            GotoTargetHandler.GotoData gotoData = NavigationTestUtils.invokeGotoImplementations(getEditor(), getFile());
+            NavigationTestUtils.assertGotoImplementations(getEditor(), gotoData);
+            }
+        catch (Exception exc) {
+            throw new RuntimeException(exc);
+        }
     }
 
     @Override
