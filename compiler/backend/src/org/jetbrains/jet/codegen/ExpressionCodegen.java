@@ -2260,11 +2260,10 @@ public class ExpressionCodegen extends JetVisitor<StackValue, StackValue> implem
                 if (originalOfSamAdapter != null) {
                     JetType samAdapterType = originalOfSamAdapter.getValueParameters().get(valueParameter.getIndex()).getType();
                     if (SingleAbstractMethodUtils.isSamType(samAdapterType)) {
-                        ClassDescriptor samInterface = (ClassDescriptor) samAdapterType.getConstructor().getDeclarationDescriptor();
+                        JvmClassName className = bindingContext.get(CodegenBinding.FQN_FOR_SAM_WRAPPER_IN_ADAPTER_CALL, argumentExpression);
+                        assert className != null : "internal class name not found for " + argumentExpression.getText();
 
-                        // TODO support not literals
-                        genClosure(((JetFunctionLiteralExpression) argumentExpression).getFunctionLiteral(), samInterface);
-                        continue;
+                        createSamValue(argumentExpression, ((ExpressionValueArgument) resolvedValueArgument), valueParameter.getType(), samAdapterType, className);
                     }
                 }
                 gen(argumentExpression, valueParameterTypes.get(valueParameter.getIndex()));

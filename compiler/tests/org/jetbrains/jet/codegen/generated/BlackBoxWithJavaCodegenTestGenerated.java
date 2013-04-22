@@ -127,6 +127,11 @@ public class BlackBoxWithJavaCodegenTestGenerated extends AbstractBlackBoxCodege
             doTestWithJava("compiler/testData/codegen/boxWithJava/samAdapters/fileFilter.kt");
         }
         
+        @TestMetadata("nonLiteralAsSamParameter.kt")
+        public void testNonLiteralAsSamParameter() throws Exception {
+            doTestWithJava("compiler/testData/codegen/boxWithJava/samAdapters/nonLiteralAsSamParameter.kt");
+        }
+        
         @TestMetadata("severalSamParameters.kt")
         public void testSeveralSamParameters() throws Exception {
             doTestWithJava("compiler/testData/codegen/boxWithJava/samAdapters/severalSamParameters.kt");

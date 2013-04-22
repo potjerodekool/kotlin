@@ -149,7 +149,8 @@ class CodegenAnnotatingVisitor extends JetVisitorVoid {
             if (declaration instanceof JetFunctionLiteralExpression ||
                 declaration instanceof JetNamedFunction ||
                 declaration instanceof JetObjectLiteralExpression ||
-                declaration instanceof JetCallExpression) {
+                declaration instanceof JetCallExpression ||
+                declaration instanceof JetExpression) { // TODO
             }
             else {
                 throw new IllegalStateException(
