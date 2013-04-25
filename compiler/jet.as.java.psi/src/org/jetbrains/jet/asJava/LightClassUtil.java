@@ -16,6 +16,7 @@
 
 package org.jetbrains.jet.asJava;
 
+import com.google.common.collect.Lists;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.project.Project;
@@ -35,6 +36,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.jet.codegen.binding.PsiCodegenPredictor;
 import org.jetbrains.jet.lang.psi.*;
+import org.jetbrains.jet.lang.resolve.java.JvmAbi;
 import org.jetbrains.jet.lang.resolve.java.JvmClassName;
 import org.jetbrains.jet.lang.resolve.name.FqName;
 import org.jetbrains.jet.lang.types.lang.KotlinBuiltIns;
@@ -42,6 +44,7 @@ import org.jetbrains.jet.utils.KotlinVfsUtil;
 
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.util.*;
 
 public class LightClassUtil {
     private static final Logger LOG = Logger.getInstance(LightClassUtil.class);
@@ -117,41 +120,71 @@ public class LightClassUtil {
     }
 
     @Nullable
+    public static PsiMethod getLightClassAccessorMethod(@NotNull JetPropertyAccessor accessor) {
+        List<PsiMethod> wrappers = getPsiMethodWrappers(accessor);
+
+        assert wrappers.size() <= 1 : String.format("Too many elements generated for accessor: %s -> (%s)", accessor.getText(), wrappers);
+
+        return !wrappers.isEmpty() ? wrappers.get(0) : null;
+    }
+
+    @NotNull
+    public static PropertyAccessorsPsiMethods getLightClassPropertyMethods(@NotNull JetProperty property) {
+        JetPropertyAccessor getter = property.getGetter();
+        JetPropertyAccessor setter = property.getSetter();
+
+        PsiMethod getterWrapper = getter != null ? getLightClassAccessorMethod(getter) : null;
+        PsiMethod setterWrapper = setter != null ? getLightClassAccessorMethod(setter) : null;
+
+        if (getterWrapper == null || setterWrapper == null) {
+            List<PsiMethod> wrappers = getPsiMethodWrappers(property);
+            assert wrappers.size() <= 2 : "Maximum two wrappers are expected to be generated for property";
+
+            for (PsiMethod wrapper : wrappers) {
+                if (wrapper.getName().startsWith(JvmAbi.SETTER_PREFIX)) {
+                    assert setterWrapper == null : String.format(
+                            "Setter accessor isn't expected to be reassigned (old: %s, new: %s)", setterWrapper, wrapper);
+
+                    setterWrapper = wrapper;
+                }
+                else {
+                    assert setterWrapper == null : String.format(
+                            "Setter accessor isn't expected to be reassigned (old: %s, new: %s)", getterWrapper, wrapper);
+
+                    getterWrapper = wrapper;
+                }
+            }
+        }
+
+        return new PropertyAccessorsPsiMethods(getterWrapper, setterWrapper);
+    }
+
+    @Nullable
     public static PsiMethod getLightClassMethod(@NotNull JetNamedFunction function) {
-        //noinspection unchecked
-        if (PsiTreeUtil.getParentOfType(function, JetFunction.class, JetProperty.class) != null) {
-            // Don't genClassOrObject method wrappers for internal declarations. Their classes are not generated during calcStub
-            // with ClassBuilderMode.SIGNATURES mode, and this produces "Class not found exception" in getDelegate()
-            return null;
+        List<PsiMethod> wrappers = getPsiMethodWrappers(function);
+
+        assert wrappers.size() <= 1 : String.format("Too many elements generated for function: %s -> (%s)", function.getText(), wrappers);
+
+        return !wrappers.isEmpty() ? wrappers.get(0) : null;
+    }
+
+    @NotNull
+    private static List<PsiMethod> getPsiMethodWrappers(@NotNull JetDeclaration declaration) {
+        if (!(declaration instanceof JetNamedFunction || declaration instanceof JetProperty || declaration instanceof JetPropertyAccessor)) {
+            throw new IllegalArgumentException(String.format("Only %s, %s and %s declarations are expected",
+                                                             JetNamedFunction.class, JetProperty.class, JetPropertyAccessor.class));
         }
 
-        Project project = function.getProject();
-
-        PsiElement parent = function.getParent();
-        PsiClass psiClass;
-        if (parent == function.getContainingFile()) {
-            // top-level function
-            JvmClassName jvmClassName = PsiCodegenPredictor.getPredefinedJvmClassName((JetFile) parent, true);
-            if (jvmClassName == null) return null;
-
-            String fqName = jvmClassName.getFqName().getFqName();
-            psiClass = JavaElementFinder.getInstance(project).findClass(fqName, GlobalSearchScope.allScope(project));
-        }
-        else {
-            if (!(parent instanceof JetClassBody)) return null;
-            assert parent.getParent() instanceof JetClassOrObject;
-
-            // function in a class
-            JetClassOrObject classOrObject = (JetClassOrObject) parent.getParent();
-            psiClass = getPsiClass(classOrObject);
+        PsiClass psiClass = getWrappingClass(declaration);
+        if (psiClass == null) {
+            return Collections.emptyList();
         }
 
-        if (psiClass == null) return null;
-
+        List<PsiMethod> methods = Lists.newArrayList();
         for (PsiMethod method : psiClass.getMethods()) {
             try {
-                if (method instanceof PsiCompiledElement && ((PsiCompiledElement) method).getMirror() == function) {
-                    return method;
+                if (method instanceof PsiCompiledElement && ((PsiCompiledElement) method).getMirror() == declaration) {
+                    methods.add(method);
                 }
             }
             catch (ProcessCanceledException e) {
@@ -159,23 +192,93 @@ public class LightClassUtil {
             }
             catch (Throwable e) {
                 throw new IllegalStateException(
-                        "Error while wrapping function " + function.getName() +
+                        "Error while wrapping function " + declaration.getName() +
                         "Context\n:" +
                         String.format("=== In file ===\n" +
-                                        "%s\n" +
-                                        "===On element===\n" +
-                                        "%s\n" +
-                                        "===WrappedElement===\n" +
-                                        "%s\n",
-                                        function.getContainingFile().getText(),
-                                        function.getText(),
-                                        method.toString()),
+                                      "%s\n" +
+                                      "=== On element ===\n" +
+                                      "%s\n" +
+                                      "=== WrappedElement ===\n" +
+                                      "%s\n",
+                                      declaration.getContainingFile().getText(),
+                                      declaration.getText(),
+                                      method.toString()),
                         e
                 );
             }
         }
 
+        return methods;
+    }
+
+    @Nullable
+    private static PsiClass getWrappingClass(@NotNull JetDeclaration declaration) {
+        if (declaration instanceof JetPropertyAccessor) {
+            PsiElement propertyParent = declaration.getParent();
+            assert propertyParent instanceof JetProperty : "JetProperty is expected to be parent of accessor";
+
+            declaration = (JetProperty) propertyParent;
+        }
+
+        //noinspection unchecked
+        if (PsiTreeUtil.getParentOfType(declaration, JetFunction.class, JetProperty.class) != null) {
+            // Can't get wrappers for internal declarations. Their classes are not generated during calcStub
+            // with ClassBuilderMode.SIGNATURES mode, and this produces "Class not found exception" in getDelegate()
+            return null;
+        }
+
+        PsiElement parent = declaration.getParent();
+
+        if (parent instanceof JetFile) {
+            // top-level declaration
+            JvmClassName jvmName = PsiCodegenPredictor.getPredefinedJvmClassName((JetFile) parent, true);
+            if (jvmName != null) {
+                Project project = declaration.getProject();
+
+                String fqName = jvmName.getFqName().getFqName();
+                return JavaElementFinder.getInstance(project).findClass(fqName, GlobalSearchScope.allScope(project));
+            }
+        }
+        else if (parent instanceof JetClassBody) {
+            assert parent.getParent() instanceof JetClassOrObject;
+            return getPsiClass((JetClassOrObject) parent.getParent());
+        }
+
         return null;
+    }
+
+    public static class PropertyAccessorsPsiMethods implements Iterable<PsiMethod> {
+        private final PsiMethod getter;
+        private final PsiMethod setter;
+        private final Collection<PsiMethod> accessors = new ArrayList<PsiMethod>(2);
+
+        PropertyAccessorsPsiMethods(@Nullable PsiMethod getter, @Nullable PsiMethod setter) {
+            this.getter = getter;
+            if (getter != null) {
+                accessors.add(getter);
+            }
+
+            this.setter = setter;
+            if (setter != null) {
+                accessors.add(setter);
+            }
+        }
+
+        @Nullable
+        public PsiMethod getGetter() {
+            return getter;
+        }
+
+        @Nullable
+        public PsiMethod getSetter() {
+            return setter;
+        }
+
+        @NotNull
+        @Override
+        public Iterator<PsiMethod> iterator() {
+            return accessors.iterator();
+        }
     }
 
     private LightClassUtil() {}
