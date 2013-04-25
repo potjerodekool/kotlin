@@ -835,7 +835,7 @@ public class JetTypeMapper extends BindingTraceAware {
                 else if (isLocalNamedFun(variableDescriptor)) {
                     Type type = classNameForAnonymousClass(bindingContext, (FunctionDescriptor) variableDescriptor).getAsmType();
 
-                    signatureWriter.writeParameterType(JvmMethodParameterKind.VALUE);
+                    signatureWriter.writeParameterType(JvmMethodParameterKind.SHARED_VAR);
                     signatureWriter.writeAsmType(type, false);
                     signatureWriter.writeParameterTypeEnd();
                 }
