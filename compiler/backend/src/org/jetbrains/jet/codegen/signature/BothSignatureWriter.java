@@ -535,7 +535,24 @@ public class BothSignatureWriter {
             );
         }
         else {
-            return new JvmMethodSignature(makeAsmMethod(name), makeKotlinParameterTypes());
+            return new JvmMethodSignature(makeAsmMethod(name), makeKotlinParameterTypes(), makeKotlinReturnTypeSignature());
+        }
+    }
+
+    @NotNull
+    public JvmPropertyAccessorSignature makeJvmPropertyAccessorSignature(String name, boolean isGetter) {
+        if (needGenerics) {
+            return new JvmPropertyAccessorSignature(
+                    makeAsmMethod(name),
+                    makeJavaGenericSignature(),
+                    makeKotlinMethodTypeParameters(),
+                    makeKotlinParameterTypes(),
+                    makeKotlinReturnTypeSignature(),
+                    isGetter
+            );
+        }
+        else {
+            return new JvmPropertyAccessorSignature(makeAsmMethod(name), makeKotlinParameterTypes(), makeKotlinReturnTypeSignature(), isGetter);
         }
     }
 }
