@@ -48,6 +48,8 @@ public abstract class AbstractCallExpressionTranslator extends AbstractTranslato
     @NotNull
     protected final CallType callType;
 
+    boolean hasSpreadOperator = false;
+
     protected AbstractCallExpressionTranslator(@NotNull JetCallExpression expression,
             @Nullable JsExpression receiver,
             @NotNull CallType type, @NotNull TranslationContext context) {
@@ -81,14 +83,20 @@ public abstract class AbstractCallExpressionTranslator extends AbstractTranslato
     @NotNull
     private List<JsExpression> translateVarargArgument(@NotNull List<ValueArgument> arguments) {
         List<JsExpression> translatedArgs = Lists.newArrayList();
+
         for (ValueArgument argument : arguments) {
             JetExpression argumentExpression = argument.getArgumentExpression();
             assert argumentExpression != null;
             translatedArgs.add(Translation.translateAsExpression(argumentExpression, context()));
+
+            assert !hasSpreadOperator : "Spread operator should not occur more once";
+            hasSpreadOperator = argument.getSpreadElement() != null;
         }
-        if (shouldWrapVarargInArray()) {
+
+        if (!hasSpreadOperator && shouldWrapVarargInArray()) {
             return wrapInArrayLiteral(translatedArgs);
         }
+
         return translatedArgs;
     }
 

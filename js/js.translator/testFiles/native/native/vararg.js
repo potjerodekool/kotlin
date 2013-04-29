@@ -17,3 +17,23 @@
 function paramCount() {
     return arguments.length
 }
+
+function A(size) {
+    this.size = size;
+}
+
+A.prototype.test = function (dummy /*, args */) {
+    return dummy === 0 && (arguments.length - 1) === this.size;
+};
+
+var b = {
+    test : function (size /*, args */) {
+        return (arguments.length - 1) === size;
+    }
+};
+
+function testNativeVarargWithFunLit(/* args, f */) {
+    var args = Array.prototype.slice.call(arguments, 0, arguments.length - 1);
+    var f = arguments[arguments.length - 1];
+    return typeof f === "function" && f(args);
+}

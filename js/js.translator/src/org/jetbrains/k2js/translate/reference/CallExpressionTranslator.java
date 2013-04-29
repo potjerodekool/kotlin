@@ -16,7 +16,9 @@
 
 package org.jetbrains.k2js.translate.reference;
 
-import com.google.dart.compiler.backend.js.ast.JsExpression;
+import com.google.dart.compiler.backend.js.ast.*;
+import com.intellij.openapi.util.Pair;
+import com.intellij.util.SmartList;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.jet.lang.descriptors.CallableDescriptor;
@@ -24,10 +26,10 @@ import org.jetbrains.jet.lang.descriptors.ValueParameterDescriptor;
 import org.jetbrains.jet.lang.psi.JetCallExpression;
 import org.jetbrains.jet.lang.psi.JetExpression;
 import org.jetbrains.jet.lang.psi.JetSimpleNameExpression;
-import org.jetbrains.jet.lang.resolve.calls.util.ExpressionAsFunctionDescriptor;
 import org.jetbrains.jet.lang.resolve.calls.model.ResolvedCall;
 import org.jetbrains.jet.lang.resolve.calls.model.ResolvedValueArgument;
 import org.jetbrains.jet.lang.resolve.calls.model.VariableAsFunctionResolvedCall;
+import org.jetbrains.jet.lang.resolve.calls.util.ExpressionAsFunctionDescriptor;
 import org.jetbrains.k2js.translate.context.TranslationContext;
 import org.jetbrains.k2js.translate.general.Translation;
 import org.jetbrains.k2js.translate.utils.AnnotationsUtils;
@@ -62,10 +64,31 @@ public final class CallExpressionTranslator extends AbstractCallExpressionTransl
 
     @NotNull
     private JsExpression translate() {
+        List<JsExpression> args = translateArguments();
+
+        if (isNativeFunctionCall && hasSpreadOperator) {
+            String functionName = resolvedCall.getCandidateDescriptor().getOriginal().getName().getIdentifier();
+
+            JsNameRef function;
+            if (receiver != null) {
+                Pair<JsVars.JsVar, JsNameRef> evaluatedReceiver = context().dynamicContext().createTemporary(receiver);
+                context().addStatementToCurrentBlock(new JsVars(evaluatedReceiver.first));
+
+                function = new JsNameRef(functionName, evaluatedReceiver.second);
+                args.add(0, evaluatedReceiver.second);
+            }
+            else {
+                function = new JsNameRef(functionName);
+                args.add(0, JsLiteral.NULL);
+            }
+
+            return new JsInvocation(new JsNameRef("apply", function), args);
+        }
+
         return CallBuilder.build(context())
                 .receiver(getReceiver())
                 .callee(getCalleeExpression())
-                .args(translateArguments())
+                .args(args)
                 .resolvedCall(getResolvedCall())
                 .type(callType)
                 .translate();
@@ -118,10 +141,27 @@ public final class CallExpressionTranslator extends AbstractCallExpressionTransl
     @NotNull
     private List<JsExpression> translateArguments() {
         List<JsExpression> result = new ArrayList<JsExpression>();
+        List<JsExpression> argsBeforeVararg = null;
         for (ValueParameterDescriptor parameterDescriptor : resolvedCall.getResultingDescriptor().getValueParameters()) {
             ResolvedValueArgument actualArgument = resolvedCall.getValueArgumentsByIndex().get(parameterDescriptor.getIndex());
-            result.addAll(translateSingleArgument(actualArgument, parameterDescriptor));
+
+            List<JsExpression> translatedArgument = translateSingleArgument(actualArgument, parameterDescriptor);
+
+            // if this is native call and translatedArgument has spread operator
+            if (isNativeFunctionCall && hasSpreadOperator) {
+                assert argsBeforeVararg == null;
+                argsBeforeVararg = result;
+                result = new ArrayList<JsExpression>();
+            }
+
+            result.addAll(translatedArgument);
         }
+
+        if (argsBeforeVararg != null && !argsBeforeVararg.isEmpty()) {
+            JsInvocation concatArguments = new JsInvocation(new JsNameRef("concat", new JsArrayLiteral(argsBeforeVararg)), result);
+            result = new SmartList<JsExpression>(concatArguments);
+        }
+
         return result;
     }
 
